@@ -98,17 +98,10 @@ def canny_ed(img_input, threshold1=100, threshold2=200):
 
     # Iterate over bands
     for i in range(12):
+
         img_i = img[:,:,i]
-
-        #kernel = (5, 5)
-        #img_i = cv2.GaussianBlur(img_i, kernel,0)
-
-        #img_i = cv2.normalize(img_i, None, 0, 255, cv2.NORM_MINMAX)
         
         img_i = cv2.Canny(img_i,threshold1 = threshold1, threshold2 = threshold2)
-        #img_i = feature.canny(img_i, sigma=2, low_threshold=threshold1, high_threshold=threshold2)
-
-
         img[:,:,i] = img_i
 
     return img
