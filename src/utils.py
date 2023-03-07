@@ -16,118 +16,210 @@ import random
 
 from scipy.ndimage import distance_transform_edt
 
-#gloabl variables
-global channels 
-channels = ['Coastal Aerosol','Blue','Green',
-                 'Red','Red Edge 1','Red Edge 2',
-                'Red Edge 3','NIR','Red Edge 4',
-                 'Water Vapour','SWIR 1','SWIR 2']
 
-# Functions
-def get_rgb(img):
-    """Return normalized RGB channels from sentinal image"""
+class data_processor: 
+
+    def __init__(self):
+         pass
+
+    def get_rgb(self,img):
+        """Return normalized RGB channels from sentinal image"""
+        
+        rgb_img = img[:, :, [3,2,1]]
+        rgb_normalize = np.clip(rgb_img/10000, 0, 0.3)/0.3
+        
+        return rgb_normalize
+
+    def load_test(self,path):
+        """Returns sentinal image, rgb image and label"""
+        
+        img = gdal.Open(path).ReadAsArray()
+        stack_img = np.stack(img, axis=-1)
+        rgb_img = self.get_rgb(stack_img)
+        
+        label_path = path.replace("images","labels").replace("image","label")
+        label = gdal.Open(label_path).ReadAsArray()
+        
+        return stack_img, rgb_img, label
     
-    rgb_img = img[:, :, [3,2,1]]
-    rgb_normalize = np.clip(rgb_img/10000, 0, 0.3)/0.3
+    def fom(self,ref_img,img, alpha = 1.0 / 9):
+        """
+        Computes Pratt's Figure of Merit for the given image img, using a gold
+        standard image as source of the ideal edge pixels.
+        """
+        
+        # Compute the distance transform for the gold standard image.
+        dist = distance_transform_edt(np.invert(ref_img))
+
+        fom = 1.0 / np.maximum(
+            np.count_nonzero(img),
+            np.count_nonzero(ref_img))
+
+        N, M = img.shape
+
+        for i in range(N):
+            for j in range(M):
+                if img[i, j]:
+                    fom += 1.0 / ( 1.0 + dist[i, j] * dist[i, j] * alpha)
+
+        fom /= np.maximum(
+            np.count_nonzero(img),
+            np.count_nonzero(ref_img))    
+
+        return fom
+
+    def get_rates(self,ref_img,img):
+            """Calculate true positive, false positive, true negative and false negative rates"""
+
+            h,w = img.shape
+
+            p = np.count_nonzero(ref_img)
+            n = np.count_nonzero(np.logical_not(ref_img))
+
+            
+            tp = np.count_nonzero(np.logical_and(img,ref_img))
+            fp = np.count_nonzero(np.logical_and(img,np.logical_not(ref_img)))
+            tn = np.count_nonzero(np.logical_and(np.logical_not(img),np.logical_not(ref_img)))
+            fn = np.count_nonzero(np.logical_and(np.logical_not(img),ref_img))
+
+            tpr = tp/p
+            fpr = fp/n
+            tnr = tn/n
+            fnr = fn/p
+
+            fp_fn_ratio = fp/fn
+
+            return tp,fp,tn,fn,tpr,fpr,tnr,fnr,fp_fn_ratio
+
+    def preprocess(self,img_input):
+            """Preprocess image for edge detection"""
+            img = img_input.copy()
+            img = np.array(img)
+
+            # Iterate over bands
+            for i in range(12):
+                    img_i = img[:,:,i]
+
+                    # Scale bands between 0 and 255
+                    img[:,:,i] = cv2.normalize(img[:,:,i], None, 0, 255, cv2.NORM_MINMAX)
+                    img_i = np.uint8(img_i)
     
-    return rgb_normalize
+                    img[:,:,i] = img_i
+        
+            img = np.uint8(img)
+            return img
 
-def load_test(path):
-    """Returns sentinal image, rgb image and label"""
-    
-    img = gdal.Open(path).ReadAsArray()
-    stack_img = np.stack(img, axis=-1)
-    rgb_img = get_rgb(stack_img)
-    
-    label_path = path.replace("images","labels").replace("image","label")
-    label = gdal.Open(label_path).ReadAsArray()
-    
-    return stack_img, rgb_img, label
 
-def fom(ref_img,img, alpha = 1.0 / 9):
-    """
-    Computes Pratt's Figure of Merit for the given image img, using a gold
-    standard image as source of the ideal edge pixels.
-    """
-    
-    # Compute the distance transform for the gold standard image.
-    dist = distance_transform_edt(np.invert(ref_img))
+    def canny_ed(self,img_input, threshold1=100, threshold2=200):
 
-    fom = 1.0 / np.maximum(
-        np.count_nonzero(img),
-        np.count_nonzero(ref_img))
-
-    N, M = img.shape
-
-    for i in range(N):
-        for j in range(M):
-            if img[i, j]:
-                fom += 1.0 / ( 1.0 + dist[i, j] * dist[i, j] * alpha)
-
-    fom /= np.maximum(
-        np.count_nonzero(img),
-        np.count_nonzero(ref_img))    
-
-    return fom
-
-def preprocess(img_input):
-        """Preprocess image for edge detection"""
+        """Apply canny edge detection to image"""
+        
         img = img_input.copy()
-        img = np.array(img)
+        img = self.preprocess(img)
 
         # Iterate over bands
         for i in range(12):
-                img_i = img[:,:,i]
 
-                # Scale bands between 0 and 255
-                img[:,:,i] = cv2.normalize(img[:,:,i], None, 0, 255, cv2.NORM_MINMAX)
-                img_i = np.uint8(img_i)
- 
-                img[:,:,i] = img_i
-       
-        img = np.uint8(img)
+            img_i = img[:,:,i]
+            
+            img_i = cv2.Canny(img_i,threshold1 = threshold1, threshold2 = threshold2)
+            img[:,:,i] = img_i
+
         return img
+     
 
+class data_visualizer:
 
-def canny_ed(img_input, threshold1=100, threshold2=200):
+    def __init__(self,df_metrics,canny,edge_reference,thresholds,channels):
+        self.df_metrics = df_metrics
+        self.canny = canny
+        self.edge_reference = edge_reference
+        self.thresholds = thresholds
+        self.channels = channels
 
-    """Apply canny edge detection to image"""
-    
-    img = img_input.copy()
-    img = preprocess(img)
+    def plot_metric_trends(self,metric,ylabel=None,save_path=None):
 
-    # Iterate over bands
-    for i in range(12):
-
-        img_i = img[:,:,i]
+        """Plot trends of metrics for different thresholds and bands"""
         
-        img_i = cv2.Canny(img_i,threshold1 = threshold1, threshold2 = threshold2)
-        img[:,:,i] = img_i
+        thresholds = self.df_metrics['thresholds'].unique()
 
-    return img
+        mean =  self.df_metrics.groupby(["thresholds","band"],as_index=False).mean()
+        sd =  self.df_metrics.groupby(["thresholds","band"],as_index=False).std()
 
-def plot_metric_trends(df,metric):
+        fig,ax = plt.subplots(1,1,figsize=(15,5))
 
-    """Plot trends of metrics for different thresholds and bands"""
-    
-    thresholds = df['thresholds'].unique()
+        w = 0.4
+        for i,thresh in enumerate(thresholds):
 
-    mean =  df.groupby(["thresholds","band"],as_index=False).mean()
-    sd =  df.groupby(["thresholds","band"],as_index=False).std()
+            bands = mean[mean.thresholds==str(thresh)]["band"]
 
-    fig,ax = plt.subplots(1,1,figsize=(15,5))
+            mean_i = mean[mean.thresholds==str(thresh)][metric]
+            sd_i = sd[sd.thresholds==str(thresh)][metric]
+            
+            plt.bar(bands-w/3+i*w/3,mean_i,yerr=sd_i,width=w/3,label=str(thresh))
 
-    w = 0.4
-    for i,thresh in enumerate(thresholds):
+        if ylabel:
+             plt.ylabel(ylabel,fontsize=20)
+        else:
+            plt.ylabel(metric.upper(),fontsize=20)
 
-        bands = mean[mean.thresholds==str(thresh)]["band"]
 
-        mean_i = mean[mean.thresholds==str(thresh)][metric]
-        sd_i = sd[sd.thresholds==str(thresh)][metric]
-        
-        plt.bar(bands-w/3+i*w/3,mean_i,yerr=sd_i,width=w/3,label=str(thresh))
+        plt.xticks(ticks=range(1,13),labels= self.channels,fontsize=15, rotation=90)
+        plt.yticks(fontsize=15)
 
-    plt.ylabel(metric.upper(),fontsize=20)
-    plt.xticks(ticks=range(1,13),labels= channels,fontsize=15, rotation=90)
+        legend = plt.legend(title="Thresholds",fontsize=12,loc=(1.01, 0.44))
+        legend.get_title().set_fontsize('15')
 
-    plt.legend(title="Thresholds")
+        if save_path:
+            plt.tight_layout()
+            fig.set_facecolor('white')
+            plt.savefig(save_path)
+
+    def get_title(self,ID,threshold,band = 7):
+            """Get title for image. Set the best metric to bold"""
+            
+            IMG_ID = "IMG#{}".format(ID)
+            df = self.df_metrics[(self.df_metrics['ID']==IMG_ID) & (self.df_metrics['band']==band)]
+            df_thresh = df[df['thresholds']==str(threshold)]
+
+            title = "\nRMSE: " 
+            rmse_ = df_thresh['rmse'].values[0]
+
+            if df['rmse'].min() == rmse_:
+                    title += r"$\bf{" + str(round(rmse_,2)) + "}$" 
+            else:
+                    title += str(round(rmse_,2))
+            
+            for metric in ['psnr','ssim','fom']:
+                    title += "\n" + metric.upper() + ": "
+                    metric_ = df_thresh[metric].values[0]
+                    if df[metric].max() == metric_:
+                            title += r"$\bf{" + str(round(metric_,2)) + "}$"
+                    else:
+                            title +=  str(round(metric_,2))
+
+            return title
+
+    def example_plots(self,IDs,band=7,save_path=None):
+        """Plot example images and metrics"""
+
+        fig, axs = plt.subplots(len(IDs), 7, figsize=(30, 5*len(IDs)+2))
+        fig.set_facecolor('white')
+
+        for i, ID in enumerate(IDs):
+
+            axs[i,0].imshow(255-self.edge_reference[ID], cmap='gray')
+            axs[i,0].set_title("Reference",size=20)
+
+            for j, threshold in enumerate(self.thresholds):
+                img = self.canny[str(threshold)][ID][:,:,band]
+
+                axs[i,j+1].imshow(255-img, cmap='gray')
+                axs[i,j+1].set_title(self.get_title(ID, threshold),size=20)
+
+        for ax in axs.flat:
+            ax.set_xticks([])
+            ax.set_yticks([])
+
+        if save_path: 
+            plt.savefig(save_path, bbox_inches='tight', dpi=300)
