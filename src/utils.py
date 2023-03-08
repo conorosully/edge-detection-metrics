@@ -175,6 +175,57 @@ class data_visualizer:
             fig.set_facecolor('white')
             plt.savefig(save_path)
 
+    def plot_combined_metric_trends(self,metrics,ylabel=None,save_path=None):
+
+        """Plot trends of metrics for different thresholds and bands"""
+        
+        thresholds = self.df_metrics['thresholds'].unique()
+
+        mean =  self.df_metrics.groupby(["thresholds","band"],as_index=False).mean()
+        sd =  self.df_metrics.groupby(["thresholds","band"],as_index=False).std()
+
+        n = len(metrics)
+        fig,ax = plt.subplots(n,1,figsize=(15,4*n))
+
+        for j,metric in enumerate(metrics):
+            
+            w = 0.8
+            for i,thresh in enumerate(thresholds):
+
+                bands = mean[mean.thresholds==str(thresh)]["band"]
+
+                mean_i = mean[mean.thresholds==str(thresh)][metric]
+                sd_i = sd[sd.thresholds==str(thresh)][metric]
+                
+                ax[j].bar(bands-w/3+i*w/6,mean_i,yerr=sd_i,width=w/6,label=str(thresh))
+
+            if ylabel:
+                ax[j].set_ylabel(ylabel,fontsize=20)
+            else:
+                ax[j].set_ylabel(metric.upper(),fontsize=20)
+
+            # Set xticks
+            if j == n-1:
+                ax[j].set_xticks(ticks=range(1,13),labels= self.channels,fontsize=20, rotation=90)
+            else:
+                ax[j].set_xticks(ticks=range(1,13),fontsize=15)
+                ax[j].set_xticklabels([])
+            
+            # Set yticks
+            #yticks = np.round(ax[j].get_yticks())
+            #ax[j].set_yticklabels(yticks,fontsize=15)
+            ax[j].tick_params(axis='y', which='major', labelsize=15)
+
+            # Legend
+            if j == 0:
+                legend = ax[0].legend(title="Thresholds",fontsize=12,loc=(1.01, 0.35))
+                legend.get_title().set_fontsize('15')
+
+        plt.tight_layout(pad = 2)
+        if save_path:
+            fig.set_facecolor('white')
+            plt.savefig(save_path)
+
     def get_title(self,ID,threshold,band = 7):
             """Get title for image. Set the best metric to bold"""
             
