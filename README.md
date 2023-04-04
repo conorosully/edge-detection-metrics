@@ -20,12 +20,10 @@ You can find the following files in the src folder:
 
 - `comparison-metrics.ipynb` The main analysis file used to apply Canny edge detection, calculate evaluation metrics and create all figures in the research paper. The file is also used to display the figures used to perform the visual analysis. 
 - `utils.py` Helper file containing functions used to perform the analysis in the main analysis file. 
-- `test-image-issues.ipynb` Display the images in the SWED test set that had erronous segmentaiton masks
+- `test-image-issues.ipynb` Display the images in the SWED test set that had erroneous segmentation masks
 
 ## Result Files
 You can find the following files used in the analysis:
 
-- `Visual Analysis.xlsx` Contians the results of the visual analysis
+- `Visual Analysis.xlsx` Contains the results of the visual analysis
 - `canny_evaluation_metrics.csv` Contains the values for RMSE, PSNR, SSIM and FOM and confusion matrix measures at different hysteresis thresholds
-
-
