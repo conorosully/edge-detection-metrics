@@ -98,6 +98,7 @@ class data_processor:
 
             # Iterate over bands
             for i in range(12):
+                    
                     img_i = img[:,:,i]
 
                     # Scale bands between 0 and 255
@@ -130,10 +131,11 @@ class data_processor:
 
 class data_visualizer:
 
-    def __init__(self,df_metrics,canny,edge_reference,thresholds,channels):
+    def __init__(self,df_metrics,canny,edge_reference,rgb,thresholds,channels):
         self.df_metrics = df_metrics
         self.canny = canny
         self.edge_reference = edge_reference
+        self.rgb = rgb
         self.thresholds = thresholds
         self.channels = channels
 
@@ -251,7 +253,7 @@ class data_visualizer:
 
             return title
 
-    def example_plots(self,IDs,band=7,save_path=None):
+    def example_plots(self,IDs,band=7,ex_diff = 0,show_metrics=True,save_path=None):
         """Plot example images and metrics"""
 
         fig, axs = plt.subplots(len(IDs), 7, figsize=(30, 5*len(IDs)+2))
@@ -260,13 +262,57 @@ class data_visualizer:
         for i, ID in enumerate(IDs):
 
             axs[i,0].imshow(255-self.edge_reference[ID], cmap='gray')
-            axs[i,0].set_title("Reference",size=20)
+            
+            axs[i,0].set_ylabel("Example {}".format(i+1+ex_diff),size=25,weight='bold')
+
+            if i == 0:
+                axs[i,0].set_title("Thresholds:\n\n\n\n\nReference",size=20)
+            else:
+                axs[i,0].set_title("Ground Truth",size=20)
+
+
 
             for j, threshold in enumerate(self.thresholds):
                 img = self.canny[str(threshold)][ID][:,:,band]
 
                 axs[i,j+1].imshow(255-img, cmap='gray')
-                axs[i,j+1].set_title(self.get_title(ID, threshold),size=20)
+
+                title = self.get_title(ID, threshold)
+                if i == 0:
+                    title = str(threshold) + "\n" +  title
+                
+                if show_metrics==False:
+                    title = str(threshold)
+                
+                axs[i,j+1].set_title(title,size=20)
+
+        for ax in axs.flat:
+            ax.set_xticks([])
+            ax.set_yticks([])
+
+        if save_path: 
+            plt.savefig(save_path, bbox_inches='tight', dpi=300)
+
+
+    def example_plots_rgb(self,IDs,band=7,save_path=None):
+        """Plot example images and metrics"""
+
+        fig, axs = plt.subplots(len(IDs), 8, figsize=(30, 5*len(IDs)+2))
+        fig.set_facecolor('white')
+
+        for i, ID in enumerate(IDs):
+
+            axs[i,0].imshow(self.rgb[ID])
+            axs[i,1].set_title("RGB",size=20)
+
+            axs[i,1].imshow(255-self.edge_reference[ID], cmap='gray')
+            axs[i,1].set_title("Reference",size=20)
+
+            for j, threshold in enumerate(self.thresholds):
+                img = self.canny[str(threshold)][ID][:,:,band]
+
+                axs[i,j+2].imshow(255-img, cmap='gray')
+                axs[i,j+2].set_title(self.get_title(ID, threshold),size=20)
 
         for ax in axs.flat:
             ax.set_xticks([])
