@@ -3,7 +3,7 @@ Exploring the effectiveness of RMSE, PSNR, SSIM and FOM for evaluation edge dete
 
 This repository contains the code required to reproduce the results in the conference paper:
 
-> To update
+`C. O'Sullivan, S. Coveney, X. Monteys and S. Dev, "The Effectiveness of Edge Detection Evaluation Metrics for Automated Coastline Detection," 2023 Photonics & Electromagnetics Research Symposium (PIERS), 2023, pp. 31-40, doi: 10.1109/PIERS59004.2023.10221292.` [available here](https://arxiv.org/abs/2405.11498)
 
 This code is only for academic and research purposes. Please cite the above paper if you intend to use whole/part of the code. 
 
